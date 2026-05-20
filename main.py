@@ -1,25 +1,32 @@
+from src.generation.llm_client import create_ollama_client, verify_ollama_connection
 from src.data_processing.parsers.factory import process_heterogeneous_data
-from src.generation.llm_client import create_ollama_client
+
+MODEL_NAME = "qwen3.5:9b"
+OLLAMA_BASE_URL = "http://localhost:11434"
 
 
-def main():
-    # 初始化ollama本地大模型
+def init_llm():
+    """初始化 LLM，包含连接校验。"""
     print("正在初始化ollama本地大模型...")
-    llm = create_ollama_client(
-        model_name="qwen3.5:9b",
-        base_url="http://localhost:11434",
-        temperature=0.7,
-    )
-    # fix: 并没有验证是否启动了大模型
-    if llm:
-        print(f"ollama本地大模型初始化成功！\n{llm.name} 已准备就绪。")
-    else:
-        print("ollama本地大模型初始化失败！")
+
+    # 1. 先校验连接
+    status = verify_ollama_connection(MODEL_NAME, OLLAMA_BASE_URL)
+    if not status["ok"]:
+        print(f"[错误] {status['message']}")
+        return None
+    if not status["model_ready"]:
+        print(f"[警告] {status['message']}")
+        return None
+
+    # 2. 连接校验通过后，再创建客户端
+    llm = create_ollama_client(MODEL_NAME, OLLAMA_BASE_URL, temperature=0.7)
+    print(f"✓ ollama本地大模型初始化成功！{llm.name} 已准备就绪。")
+    return llm
 
 
 if __name__ == "__main__":
     # 初始化大模型
-    main()
+    llm = init_llm()
 
     files = [
         "./data/raw/美的2025年报.pdf",
