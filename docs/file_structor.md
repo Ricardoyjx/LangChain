@@ -37,10 +37,13 @@ financial_rag_project/
 │   │   ├── prompt_template.py  # 存放各类业务的 Prompt 模板
 │   │   └── llm_client.py       # 大语言模型（LLM）的调用接口封装
 │   │
-│   └── utils/                  # 公共工具模块
-│       ├── __init__.py
-│       ├── file_utils.py       # 文件路径处理、后缀获取等工具
-│       └── embedding_client.py # Embedding 向量化模型的统一调用接口
+│   ├── utils/                  # 公共工具模块
+│   │   ├── __init__.py
+│   │   ├── file_utils.py       # 文件路径处理、后缀获取等工具
+│   │   └── embedding_client.py # Embedding 向量化模型的统一调用接口
+│   │
+│   ├── pipeline.py             # ⭐（新增）管线编排：串联 ingest / query 全流程
+│   └── evaluator.py            # ⭐（新增）金融 RAG 评估器：数字准确率 + 忠实度
 │
 ├── tests/                      # 单元测试目录（对应 src 里的模块进行测试）
 │   ├── test_parsers.py
