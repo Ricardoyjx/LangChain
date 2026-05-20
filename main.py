@@ -27,6 +27,10 @@ def init_llm():
 if __name__ == "__main__":
     # 初始化大模型
     llm = init_llm()
+    # 如果模型初始化失败，直接退出
+    if llm is None:
+        print("无法继续执行，模型未准备好。")
+        exit(1)
 
     files = [
         "./data/raw/美的2025年报.pdf",
