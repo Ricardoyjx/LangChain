@@ -8,3 +8,18 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Environment & secrets
+.env
+
+# IDE & editor config
+.vscode/
+
+# Codex / Claude personal settings
+.claude/settings.local.json
+
+# Auto-generated vector database
+chroma_db/
+
+# Data files (PDFs, raw data, etc.)
+data/
