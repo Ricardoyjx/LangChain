@@ -38,7 +38,7 @@ class IngestPipeline:
 
         Returns:
             dict: {
-                "chunks": List[str],       # 切分后的文本块列表
+                "chunks": List[Dict],      # 切分后的文本块，每块含 content + metadata
                 "chunk_count": int,        # 文本块数量
                 "tables": List[Any],       # 提取的表格数据
                 "metadata": Dict,          # 文档元数据
@@ -54,8 +54,13 @@ class IngestPipeline:
         # 阶段二：清洗
         cleaned = clean_text(content)
 
-        # 阶段三：切分
-        chunks = chunk_text(cleaned, self.chunk_size, self.chunk_overlap)
+        # 阶段三：切分（携带源文件元数据到每个分块）
+        chunks = chunk_text(
+            text=cleaned,
+            chunk_size=self.chunk_size,
+            chunk_overlap=self.chunk_overlap,
+            metadata=metadata,
+        )
 
         return {
             "chunks": chunks,
@@ -78,7 +83,7 @@ class QueryPipeline:
     def run(
         self,
         query: str,
-        chunks: Optional[List[str]] = None,
+        chunks: Optional[List[Dict[str, Any]]] = None,
         context: Optional[str] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
     ) -> str:
@@ -86,7 +91,7 @@ class QueryPipeline:
 
         Args:
             query: 用户问题。
-            chunks: 可用的检索候选文本块列表。
+            chunks: 带元数据的候选文本块列表。
             context: 外部传入的上下文（如已有检索结果时）。
             chat_history: 对话历史 [{"role": "user"/"assistant", "content": str}].
 
