@@ -1,0 +1,21 @@
+[project]
+name = "langchain"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "chromadb>=1.5.9",
+    "langchain-community>=0.4.1",
+    "langchain-core>=1.4.0",
+    "langchain-huggingface>=1.2.2",
+    "langchain-ollama>=1.1.0",
+    "langchain-openai>=1.2.1",
+    "langchian>=0.2.5",
+    "ollama>=0.6.2",
+    "python-dotenv>=1.2.2",
+    "redis>=7.4.0",
+    "sentence-transformers>=5.5.0",
+    "torch==2.11.0",
+    "transformers>=5.8.1",
+]

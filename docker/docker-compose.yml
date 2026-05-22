@@ -1,0 +1,119 @@
+name: langchain-rag
+
+services:
+  # ── 缓存与聊天历史 ──────────────────────────────────────
+  redis:
+    image: redis:alpine
+    container_name: lc-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - rag-net
+
+  # ── 向量数据库 ────────────────────────────────────────────
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.25
+    container_name: lc-etcd
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - etcd-data:/etcd
+    command: >
+      etcd --advertise-client-urls http://etcd:2379 --listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    healthcheck:
+      test: [ "CMD", "etcdctl", "endpoint", "health" ]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - rag-net
+
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    container_name: lc-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # Console
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - rag-net
+
+  milvus:
+    image: milvusdb/milvus:v3.0-beta
+    container_name: lc-milvus
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+      MINIO_REGION: us-east-1
+    security_opt:
+      - seccomp:unconfined
+    volumes:
+      - milvus-data:/var/lib/milvus
+    ports:
+      - "19530:19530" # gRPC
+      - "9091:9091" # HTTP (RESTful API)
+    command: [ "milvus", "run", "standalone" ]
+    depends_on:
+      - "etcd"
+      - "minio"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9091/healthz" ]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 90s
+    restart: unless-stopped
+    networks:
+      - rag-net
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama # 使用下方定义的命名卷，挂载到容器内的 Ollama 数据目录
+    # 启用 GPU 支持
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all # 使用所有可用的 GPU
+              capabilities: [ gpu ]
+
+volumes:
+  redis-data:
+  etcd-data:
+  minio-data:
+  ollama_data:
+  milvus-data:
+
+networks:
+  rag-net:
+    name: langchain-rag-net
+    driver: bridge
