@@ -3,8 +3,10 @@ from typing import Any, Dict
 
 try:
     from docx import Document
+    from docx.opc.exceptions import PackageNotFoundError as DocxPackageNotFoundError
 except ImportError:
     Document = None  # type: ignore
+    DocxPackageNotFoundError = None  # type: ignore
 
 from .base import BaseParser
 
@@ -48,7 +50,10 @@ class WordParser(BaseParser):
                 "python-docx is required. Install it with: pip install python-docx"
             )
 
-        doc = Document(file_path)
+        try:
+            doc = Document(file_path)
+        except DocxPackageNotFoundError as e:
+            raise FileNotFoundError(str(e))
 
         # 提取段落文本
         paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
