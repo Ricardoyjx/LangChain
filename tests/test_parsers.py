@@ -13,8 +13,8 @@ from src.data_processing.parsers import (
     process_heterogeneous_data,
 )
 
-
 # ── 基类测试 ─────────────────────────────────────────────
+
 
 class TestBaseParser:
     def test_abstract_cannot_instantiate(self):
@@ -24,11 +24,13 @@ class TestBaseParser:
     def test_subclass_must_implement_parse(self):
         class IncompleteParser(BaseParser):
             pass
+
         with pytest.raises(TypeError):
             IncompleteParser()
 
 
 # ── PDF 解析器 ──────────────────────────────────────────
+
 
 class TestPDFParser:
     @pytest.fixture
@@ -94,6 +96,7 @@ class TestPDFParser:
 
 # ── Word 解析器 ─────────────────────────────────────────
 
+
 class TestWordParser:
     @pytest.fixture
     def mock_document(self):
@@ -120,7 +123,10 @@ class TestWordParser:
         return doc
 
     def test_parse_returns_expected_structure(self, mock_document):
-        with patch("src.data_processing.parsers.word_parser.Document", return_value=mock_document):
+        with patch(
+            "src.data_processing.parsers.word_parser.Document",
+            return_value=mock_document,
+        ):
             result = WordParser().parse("/fake/sample.docx")
         assert isinstance(result, dict)
         assert "content" in result
@@ -128,13 +134,19 @@ class TestWordParser:
         assert "tables" in result
 
     def test_parse_content(self, mock_document):
-        with patch("src.data_processing.parsers.word_parser.Document", return_value=mock_document):
+        with patch(
+            "src.data_processing.parsers.word_parser.Document",
+            return_value=mock_document,
+        ):
             result = WordParser().parse("/fake/sample.docx")
         assert "测试文档标题" in result["content"]
         assert "第二段内容" in result["content"]
 
     def test_parse_metadata(self, mock_document):
-        with patch("src.data_processing.parsers.word_parser.Document", return_value=mock_document):
+        with patch(
+            "src.data_processing.parsers.word_parser.Document",
+            return_value=mock_document,
+        ):
             result = WordParser().parse("/fake/sample.docx")
         meta = result["metadata"]
         assert meta["type"] == "docx"
@@ -143,7 +155,10 @@ class TestWordParser:
         assert meta["table_count"] >= 1
 
     def test_parse_tables(self, mock_document):
-        with patch("src.data_processing.parsers.word_parser.Document", return_value=mock_document):
+        with patch(
+            "src.data_processing.parsers.word_parser.Document",
+            return_value=mock_document,
+        ):
             result = WordParser().parse("/fake/sample.docx")
         tables = result["tables"]
         assert len(tables) == 1
@@ -161,6 +176,7 @@ class TestWordParser:
 
 # ── Excel 解析器 ────────────────────────────────────────
 
+
 class TestExcelParser:
     @pytest.fixture
     def mock_workbook(self):
@@ -168,19 +184,23 @@ class TestExcelParser:
         wb.sheetnames = ["销售数据", "汇总"]
 
         ws1 = MagicMock()
-        ws1.iter_rows.return_value = iter([
-            ("产品", "数量", "金额"),
-            ("A产品", 100, 1500),
-            ("B产品", 200, 3200),
-            ("C产品", 150, 2250),
-        ])
+        ws1.iter_rows.return_value = iter(
+            [
+                ("产品", "数量", "金额"),
+                ("A产品", 100, 1500),
+                ("B产品", 200, 3200),
+                ("C产品", 150, 2250),
+            ]
+        )
 
         ws2 = MagicMock()
-        ws2.iter_rows.return_value = iter([
-            ("月份", "收入"),
-            ("一月", 10000),
-            ("二月", 12000),
-        ])
+        ws2.iter_rows.return_value = iter(
+            [
+                ("月份", "收入"),
+                ("一月", 10000),
+                ("二月", 12000),
+            ]
+        )
 
         def getitem(name):
             mapping = {"销售数据": ws1, "汇总": ws2}
@@ -230,21 +250,27 @@ class TestExcelParser:
         assert "汇总" in result["content"]
 
     def test_parse_file_not_found(self):
-        with patch("openpyxl.load_workbook", side_effect=FileNotFoundError("No such file")):
+        with patch(
+            "openpyxl.load_workbook", side_effect=FileNotFoundError("No such file")
+        ):
             with pytest.raises(FileNotFoundError):
                 ExcelParser().parse("/fake/missing.xlsx")
 
 
 # ── 工厂测试 ────────────────────────────────────────────
 
+
 class TestDocumentParserFactory:
-    @pytest.mark.parametrize("ext,expected_cls", [
-        (".pdf", PDFParser),
-        (".docx", WordParser),
-        (".doc", WordParser),
-        (".xlsx", ExcelParser),
-        (".xls", ExcelParser),
-    ])
+    @pytest.mark.parametrize(
+        "ext,expected_cls",
+        [
+            (".pdf", PDFParser),
+            (".docx", WordParser),
+            (".doc", WordParser),
+            (".xlsx", ExcelParser),
+            (".xls", ExcelParser),
+        ],
+    )
     def test_get_parser_by_extension(self, ext, expected_cls):
         parser = DocumentParserFactory.get_parser(f"/tmp/sample{ext}")
         assert isinstance(parser, expected_cls)
@@ -255,6 +281,7 @@ class TestDocumentParserFactory:
 
 
 # ── 端到端测试（整合 mock）──────────────────────────────
+
 
 class TestProcessHeterogeneousData:
     def test_process_pdf(self):
