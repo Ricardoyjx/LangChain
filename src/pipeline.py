@@ -41,6 +41,9 @@ from src.data_processing.chunker import chunk_text
 from src.data_processing.parsers.factory import process_heterogeneous_data
 from src.generation import create_ollama_client, get_prompt
 
+from dotenv import load_dotenv
+load_dotenv()
+
 # ---------------------------------------------------------------------------
 # 日志配置
 # ---------------------------------------------------------------------------
@@ -76,10 +79,10 @@ def setup_logging(
 # 默认配置
 # ---------------------------------------------------------------------------
 
-_DEFAULT_EMBEDDING_MODEL = "nomic-embed-text"
-_DEFAULT_LLM_MODEL = "qwen3.5:9b"
-_DEFAULT_OLLAMA_URL = "http://localhost:11434"
-_DEFAULT_TEMPERATURE = 0.3
+_DEFAULT_EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
+_DEFAULT_LLM_MODEL = os.getenv("LLM_MODEL", "qwen3.5:9b")
+_DEFAULT_OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+_DEFAULT_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.3"))
 
 _RRF_CONSTANT = 60  # RRF 融合常数
 

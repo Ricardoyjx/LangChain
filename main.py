@@ -23,6 +23,7 @@ if not hasattr(numpy._globals, "_signature_descriptor"):
 # ────────────────────────────────────────────────────────────
 
 import argparse
+import os
 import sys
 import traceback
 from pathlib import Path
@@ -33,6 +34,10 @@ try:
 except ImportError:
     # requests not installed; ConnectionError will be caught via builtin
     RequestsConnectionError = ConnectionError
+
+
+from dotenv import load_dotenv
+load_dotenv()
 
 from src.evaluator import FinancialEvaluator
 from src.generation.prompt_template import list_templates, format_prompt
@@ -46,9 +51,9 @@ DATA_DIR = Path("data")
 RAW_DIR = DATA_DIR / "raw"
 INDEX_DIR = DATA_DIR / "vector_db"
 
-DEFAULT_MODEL = "qwen3.5:9b"
-DEFAULT_OLLAMA_URL = "http://localhost:11434"
-DEFAULT_TEMPERATURE = 0.3
+DEFAULT_MODEL = os.getenv("LLM_MODEL", "qwen3.5:9b")
+DEFAULT_OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+DEFAULT_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.3"))
 DEFAULT_PROMPT = "rag"
 DEFAULT_TOP_K = 5
 
@@ -435,7 +440,7 @@ def main():
         print("  1. Ollama 服务未启动   -> 执行: ollama serve")
         print("  2. 端口不对             -> 检查 http://localhost:11434 是否可访问")
         print("  3. 模型未拉取           -> 执行: ollama pull qwen3.5:9b")
-        print("  4. 如需远程 Ollama     -> 修改 pipeline.py 中的 _DEFAULT_OLLAMA_URL")
+        print("  4. 如需远程 Ollama     -> 设置环境变量 OLLAMA_BASE_URL")
         sys.exit(1)
     except FileNotFoundError as e:
         print(f"[错误] 文件未找到: {e}")
