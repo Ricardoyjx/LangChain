@@ -1,5 +1,5 @@
 from typing import List, Optional
-from pymilvus import MilvusClient
+from langchain_milvus import Milvus
 from langchain_community.embeddings import DashScopeEmbeddings
 from langchain_core.embeddings import Embeddings
 from langchain_core.documents import Document
@@ -25,10 +25,10 @@ class VectorStore:
         self.collection_name = collection_name
         self.uri = uri
         # Milvus 构造函数用 connection_args 传 uri，而非直接传 uri 参数
-        self.vector_store = MilvusClient(
-            uri=uri,
+        self.vector_store = Milvus(
             collection_name=collection_name,
             embedding_function=self.embedding_function,
+            connection_args={"uri": uri},
         )
 
     def add_documents(self, documents: List[Document], ids: List[str] = None):
