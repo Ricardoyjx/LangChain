@@ -1,11 +1,16 @@
 from typing import List, Optional
 from langchain_milvus import Milvus
+from pymilvus import PyMilvusDeprecationWarning
 from langchain_community.embeddings import DashScopeEmbeddings
 from langchain_core.embeddings import Embeddings
 from langchain_core.documents import Document
 import logging
+import warnings
 
 logger = logging.getLogger(__name__)
+
+# 忽略 PyMilvus 的弃用警告
+warnings.filterwarnings("ignore", category=PyMilvusDeprecationWarning)
 
 
 class VectorStore:

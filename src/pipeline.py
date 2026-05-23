@@ -56,6 +56,7 @@ from src.retrieval import (
 )
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 # ---------------------------------------------------------------------------
@@ -127,6 +128,7 @@ _DEFAULT_MILVUS_COLLECTION = os.getenv("MILVUS_COLLECTION", "default")
 # 数据摄取管线
 # ===================================================================
 
+
 class IngestPipeline:
     """将原始文档经过 解析 → 清洗 → 切分 → 向量化索引 的全流程。
 
@@ -151,8 +153,12 @@ class IngestPipeline:
         logger.info(
             "初始化 IngestPipeline | "
             "chunk_size=%d chunk_overlap=%d embedding=%s llm=%s milvus=%s/%s",
-            chunk_size, chunk_overlap, embedding_model_name, llm_model,
-            milvus_uri, milvus_collection,
+            chunk_size,
+            chunk_overlap,
+            embedding_model_name,
+            llm_model,
+            milvus_uri,
+            milvus_collection,
         )
 
         self._all_chunks: List[Dict[str, Any]] = []
@@ -188,11 +194,13 @@ class IngestPipeline:
                 collection_name=milvus_collection,
                 embedding_function=self._embedding_model,
             )
-            logger.info("Milvus 就绪 (%.2fs) | collection=%s", time.time() - _t0, milvus_collection)
+            logger.info(
+                "Milvus 就绪 (%.2fs) | collection=%s",
+                time.time() - _t0,
+                milvus_collection,
+            )
         except Exception as e:
-            raise ConnectionError(
-                f"Milvus 连接失败 (uri={milvus_uri!r}): {e}"
-            ) from e
+            raise ConnectionError(f"Milvus 连接失败 (uri={milvus_uri!r}): {e}") from e
 
         # BM25 索引（run/build_index 后可用）
         self.bm25_store: Optional[BM25StoreManager] = None
@@ -219,10 +227,12 @@ class IngestPipeline:
         # 阶段一：解析
         _t0 = time.time()
         parsed = process_heterogeneous_data(file_path)
-        logger.info("  解析完成 (%.2fs) | 内容: %d chars | 表格: %d 个",
-                     time.time() - _t0,
-                     len(parsed.get("content", "")),
-                     len(parsed.get("tables", [])))
+        logger.info(
+            "  解析完成 (%.2fs) | 内容: %d chars | 表格: %d 个",
+            time.time() - _t0,
+            len(parsed.get("content", "")),
+            len(parsed.get("tables", [])),
+        )
 
         content = parsed.get("content", "")
         tables = parsed.get("tables", [])
@@ -234,8 +244,12 @@ class IngestPipeline:
         # 阶段二：清洗
         _t0 = time.time()
         cleaned = clean_text(content)
-        logger.info("  清洗完成 (%.2fs) | %d -> %d chars",
-                     time.time() - _t0, len(content), len(cleaned))
+        logger.info(
+            "  清洗完成 (%.2fs) | %d -> %d chars",
+            time.time() - _t0,
+            len(content),
+            len(cleaned),
+        )
 
         # 阶段三：切分
         _t0 = time.time()
@@ -245,9 +259,13 @@ class IngestPipeline:
             chunk_overlap=self.chunk_overlap,
             metadata={"source": file_path, **metadata},
         )
-        logger.info("  切分完成 (%.2fs) | chunk_size=%d overlap=%d → %d 个文本块",
-                     time.time() - _t0, self.chunk_size, self.chunk_overlap,
-                     len(chunks))
+        logger.info(
+            "  切分完成 (%.2fs) | chunk_size=%d overlap=%d → %d 个文本块",
+            time.time() - _t0,
+            self.chunk_size,
+            self.chunk_overlap,
+            len(chunks),
+        )
 
         # 阶段四：写入 Milvus（增量写入，立即持久化）
         _t0 = time.time()
@@ -258,7 +276,9 @@ class IngestPipeline:
         try:
             self.vector_store.add_documents(documents)
         except Exception as _conn_err:
-            if "ConnectionNotExistException" in type(_conn_err).__name__ or "should create connection first" in str(_conn_err):
+            if "ConnectionNotExistException" in type(
+                _conn_err
+            ).__name__ or "should create connection first" in str(_conn_err):
                 raise ConnectionError(
                     "Milvus 服务未启动。请先启动 Milvus：\n"
                     "  cd docker && docker compose up -d\n"
@@ -332,6 +352,7 @@ class IngestPipeline:
             target = base / "bm25"
             if target.exists():
                 import shutil
+
                 shutil.rmtree(target)
             index_path.rename(target)
             logger.info("BM25 索引已保存: %s", target)
@@ -339,13 +360,18 @@ class IngestPipeline:
         # chunks 元数据
         meta_path = base / "chunks_meta.json"
         with open(meta_path, "w", encoding="utf-8") as f:
-            json.dump({
-                "chunk_count": len(self._all_chunks),
-                "source_files": self._metadata.get("source_files", []),
-                "embedding_model": self._embedding_model_name,
-                "milvus_collection": self.vector_store.collection_name,
-                "milvus_uri": self.vector_store.uri,
-            }, f, ensure_ascii=False, indent=2)
+            json.dump(
+                {
+                    "chunk_count": len(self._all_chunks),
+                    "source_files": self._metadata.get("source_files", []),
+                    "embedding_model": self._embedding_model_name,
+                    "milvus_collection": self.vector_store.collection_name,
+                    "milvus_uri": self.vector_store.uri,
+                },
+                f,
+                ensure_ascii=False,
+                indent=2,
+            )
         logger.info("元数据已保存: %s", meta_path)
 
         # === 旧版 save_index (FAISS) ===
@@ -390,6 +416,7 @@ class IngestPipeline:
 # 查询管线
 # ===================================================================
 
+
 class QueryPipeline:
     """用户问题 → 混合检索 → 后过滤 → 重排序 → LLM 生成。
 
@@ -415,8 +442,12 @@ class QueryPipeline:
         self.post_filter_chain = post_filter_chain or PostFilterChain()
         self.reranker = reranker
 
-        logger.info("QueryPipeline 就绪 | top_k=%d rerank=%s filters=%d",
-                     top_k, reranker is not None, len(self.post_filter_chain.filters))
+        logger.info(
+            "QueryPipeline 就绪 | top_k=%d rerank=%s filters=%d",
+            top_k,
+            reranker is not None,
+            len(self.post_filter_chain.filters),
+        )
 
         # === 旧版 __init__ (FAISS + BM25Retriever) ===
         # self.vector_store = vector_store
@@ -450,14 +481,20 @@ class QueryPipeline:
         # 阶段四：拼上下文
         context = self._format_context(filtered)
 
-        logger.info("  检索: %d 条 → 过滤后: %d 条 | 上下文: %d chars",
-                     len(retrieved), len(filtered), len(context))
+        logger.info(
+            "  检索: %d 条 → 过滤后: %d 条 | 上下文: %d chars",
+            len(retrieved),
+            len(filtered),
+            len(context),
+        )
 
         # 阶段五：LLM 生成
         answer = self._generate(query, context, prompt_name, chat_history)
 
         elapsed = time.time() - _t_start
-        logger.info("===== 查询完成 (%.2fs) | 回答: %d chars =====", elapsed, len(answer))
+        logger.info(
+            "===== 查询完成 (%.2fs) | 回答: %d chars =====", elapsed, len(answer)
+        )
         return answer
 
     # ------------------------------------------------------------------
@@ -544,8 +581,12 @@ class QueryPipeline:
             )
 
         result = chain.invoke({})
-        logger.info("  LLM 生成 (%.2fs) | 模板: %s | 输出: %d chars",
-                     time.time() - _t0, prompt_name, len(result))
+        logger.info(
+            "  LLM 生成 (%.2fs) | 模板: %s | 输出: %d chars",
+            time.time() - _t0,
+            prompt_name,
+            len(result),
+        )
         return result
 
     # ------------------------------------------------------------------
@@ -567,8 +608,12 @@ class QueryPipeline:
             filtered = self.reranker.rerank(query, filtered)
         context = self._format_context(filtered)
 
-        logger.info("  检索: %d 条 → 过滤后: %d 条 | 上下文: %d chars",
-                     len(retrieved), len(filtered), len(context))
+        logger.info(
+            "  检索: %d 条 → 过滤后: %d 条 | 上下文: %d chars",
+            len(retrieved),
+            len(filtered),
+            len(context),
+        )
 
         if chat_history:
             prompt = get_prompt("rag_with_history")
@@ -600,7 +645,9 @@ class QueryPipeline:
             yield chunk
 
         elapsed = time.time() - _t_start
-        logger.info("===== 流式查询完成 (%.2fs) | 输出: %d tokens =====", elapsed, token_count)
+        logger.info(
+            "===== 流式查询完成 (%.2fs) | 输出: %d tokens =====", elapsed, token_count
+        )
 
         # === 旧版 stream 中内联的检索/过滤/重排逻辑同上 ===
 
@@ -618,6 +665,7 @@ class QueryPipeline:
 # ===================================================================
 # 一站式 RAG 管线
 # ===================================================================
+
 
 class RAGPipeline:
     """封装 IngestPipeline + QueryPipeline，快速上手。
@@ -637,9 +685,16 @@ class RAGPipeline:
         rerank: bool = True,
         **kwargs,
     ):
-        logger.info("初始化 RAGPipeline | chunk_size=%d overlap=%d top_k=%d rerank=%s",
-                     chunk_size, chunk_overlap, top_k, rerank)
-        self._ingest = IngestPipeline(chunk_size=chunk_size, chunk_overlap=chunk_overlap, **kwargs)
+        logger.info(
+            "初始化 RAGPipeline | chunk_size=%d overlap=%d top_k=%d rerank=%s",
+            chunk_size,
+            chunk_overlap,
+            top_k,
+            rerank,
+        )
+        self._ingest = IngestPipeline(
+            chunk_size=chunk_size, chunk_overlap=chunk_overlap, **kwargs
+        )
         self._query: Optional[QueryPipeline] = None
         self.top_k = top_k
         self.rerank = rerank
@@ -709,8 +764,11 @@ class RAGPipeline:
             post_filter_chain=chain,
             reranker=reranker,
         )
-        logger.info("RAGPipeline 准备就绪 | 总chunks=%d 总tables=%d",
-                     combined["chunk_count"], len(combined["tables"]))
+        logger.info(
+            "RAGPipeline 准备就绪 | 总chunks=%d 总tables=%d",
+            combined["chunk_count"],
+            len(combined["tables"]),
+        )
         return combined
 
         # === 旧版 ingest_multiple (FAISS + BM25Retriever) ===
@@ -730,7 +788,9 @@ class RAGPipeline:
     ) -> str:
         if self._query is None:
             raise RuntimeError("请先调用 ingest() 摄入文档。")
-        return self._query.run(question, prompt_name=prompt_name, chat_history=chat_history)
+        return self._query.run(
+            question, prompt_name=prompt_name, chat_history=chat_history
+        )
 
     # ------------------------------------------------------------------
     def stream(
@@ -741,7 +801,9 @@ class RAGPipeline:
     ):
         if self._query is None:
             raise RuntimeError("请先调用 ingest() 摄入文档。")
-        yield from self._query.stream(question, prompt_name=prompt_name, chat_history=chat_history)
+        yield from self._query.stream(
+            question, prompt_name=prompt_name, chat_history=chat_history
+        )
 
     # ------------------------------------------------------------------
     @property
