@@ -255,7 +255,16 @@ class IngestPipeline:
             Document(page_content=chunk["content"], metadata=chunk.get("metadata", {}))
             for chunk in chunks
         ]
-        self.vector_store.add_documents(documents)
+        try:
+            self.vector_store.add_documents(documents)
+        except Exception as _conn_err:
+            if "ConnectionNotExistException" in type(_conn_err).__name__ or "should create connection first" in str(_conn_err):
+                raise ConnectionError(
+                    "Milvus 服务未启动。请先启动 Milvus：\n"
+                    "  cd docker && docker compose up -d\n"
+                    "等待约 30 秒后再重新运行。"
+                ) from _conn_err
+            raise
         logger.info("  写入 Milvus (%.2fs) | %d 条", time.time() - _t0, len(documents))
 
         self._all_chunks.extend(chunks)

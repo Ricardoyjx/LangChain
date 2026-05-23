@@ -459,11 +459,22 @@ def main():
     except ValueError as e:
         print(f"[错误] 配置或参数错误: {e}")
         sys.exit(1)
+    except ConnectionError as e:
+        print(f"[错误] {e}")
+        sys.exit(1)
     except Exception as e:
-        print(f"[错误] 管线初始化发生未知异常: {e}")
-        print()
-        print("详细堆栈:")
-        traceback.print_exc()
+        err_msg = str(e)
+        if "ConnectionNotExistException" in type(e).__name__ or "should create connection first" in err_msg:
+            print("[错误] Milvus 服务未启动。请先启动 Milvus：")
+            print()
+            print("  cd docker && docker compose up -d")
+            print()
+            print("等待约 30 秒后再重新运行。")
+        else:
+            print(f"[错误] 管线初始化发生未知异常: {e}")
+            print()
+            print("详细堆栈:")
+            traceback.print_exc()
         sys.exit(1)
 
     # 仅摄入模式
