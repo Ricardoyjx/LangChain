@@ -37,6 +37,7 @@ except ImportError:
 
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from src.evaluator import FinancialEvaluator
@@ -80,7 +81,12 @@ def init_pipeline(force_reindex: bool = False) -> RAGPipeline:
         print("（如需重新构建，请删除 data/vector_db/ 目录或使用 --force-reindex）")
         pipeline._ingest.load_index(str(INDEX_DIR))
         from src.pipeline import QueryPipeline
-        from src.retrieval import PostFilterChain, DeduplicationFilter, TimeRangeFilter, BM25Reranker
+        from src.retrieval import (
+            PostFilterChain,
+            DeduplicationFilter,
+            TimeRangeFilter,
+            BM25Reranker,
+        )
 
         chain = PostFilterChain()
         chain.add_filter(DeduplicationFilter())
@@ -464,7 +470,10 @@ def main():
         sys.exit(1)
     except Exception as e:
         err_msg = str(e)
-        if "ConnectionNotExistException" in type(e).__name__ or "should create connection first" in err_msg:
+        if (
+            "ConnectionNotExistException" in type(e).__name__
+            or "should create connection first" in err_msg
+        ):
             print("[错误] Milvus 服务未启动。请先启动 Milvus：")
             print()
             print("  cd docker && docker compose up -d")
