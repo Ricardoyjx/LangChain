@@ -401,6 +401,21 @@ class IngestPipeline:
         )
         logger.info("HybridSearchManager 已恢复")
 
+        # 加载 chunks 元数据（用于展示文档/文本块数等信息）
+        meta_path = base / "chunks_meta.json"
+        if meta_path.exists():
+            with open(meta_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+            self._metadata = meta.get("source_files", [])
+            if isinstance(self._metadata, list):
+                self._metadata = {"source_files": self._metadata}
+            self._all_chunks = [{}] * meta.get("chunk_count", 0)
+            logger.info(
+                "元数据已加载: %d 个文本块, %s",
+                meta.get("chunk_count", 0),
+                meta.get("source_files", []),
+            )
+
         # === 旧版 load_index (FAISS) ===
         # self.vector_store = FAISS.load_local(str(vector_dir), self._embedding_model, allow_dangerous_deserialization=True)
         # with open(bm25_pkl, "rb") as f:

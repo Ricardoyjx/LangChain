@@ -1,4 +1,7 @@
 from typing import List, Dict
+import logging
+
+logger = logging.getLogger(__name__)
 from langchain_core.documents import Document
 
 
@@ -24,7 +27,14 @@ class HybridSearchManager:
         doc_map: Dict[str, Document] = {}
 
         for rank, doc in enumerate(vector_docs):
-            doc_id = doc.page_content
+            # page_content 必须是可哈希的字符串，否则无法作为 dict key
+            raw = doc.page_content
+            doc_id = str(raw) if not isinstance(raw, str) else raw
+            if not isinstance(raw, str):
+                logger.warning(
+                    "RRF: doc.page_content is %s (not str), converted; content=%.60s",
+                    type(raw).__name__, doc_id,
+                )
             rrf_scores[doc_id] = rrf_scores.get(doc_id, 0.0) + 1.0 / (self.k + rank + 1)
             if doc_id not in doc_map:
                 doc_map[doc_id] = doc

@@ -89,6 +89,20 @@ services:
     networks:
       - rag-net
 
+  attu:
+    image: zilliz/attu:v3.0-beta # 建议版本号与你运行的 Milvus 版本保持一致
+    container_name: attu
+    environment:
+      # 这里的 attu 是服务名，Docker 内部网络会自动解析
+      # 如果你是连接外部 Milvus，请改为具体的 IP:19530
+      MILVUS_URL: milvus-standalone:19530
+    ports:
+      - "8000:3000" # 左边是宿主机端口，右边是容器端口
+    depends_on:
+      - milvus-standalone # 确保 Milvus 先启动（如果你把 Milvus 也写在这个文件里的话）
+    networks:
+      - milvus-net # 确保 Attu 和 Milvus 在同一个网络    
+
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
@@ -117,3 +131,5 @@ networks:
   rag-net:
     name: langchain-rag-net
     driver: bridge
+  milvus-net:
+    external: true #

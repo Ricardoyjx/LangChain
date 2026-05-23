@@ -11,6 +11,9 @@ logger = logging.getLogger(__name__)
 # Milvus 向量存储（基于 pymilvus.MilvusClient，pymilvus 3.x API）
 # ===================================================================
 
+# Milvus 保留字段名，写入时不允许被 metadata 覆盖
+_RESERVED_FIELDS = {"text", "vector", "id"}
+
 
 class VectorStore:
     """Milvus 向量数据库管理器。
@@ -80,26 +83,61 @@ class VectorStore:
         return self._dimension
 
     def _ensure_collection(self) -> None:
-        """确保 Milvus 集合已存在，不存在则创建（自动推断维度）。"""
+        """确保 Milvus 集合存在且 schema 兼容。
+
+        - 如果集合不存在，按标准 schema 自动创建（auto_id, dynamic field）
+        - 如果集合存在但不是 auto_id schema（例如旧版 langchain-milvus 创建的），
+          删除后重建，保证 schema 统一
+        """
         if self._collection_ensured:
             return
 
+        # ---------- 集合已存在：检查 schema 兼容性 ----------
         if self.client.has_collection(self.collection_name):
-            logger.info(
-                "Milvus collection '%s' already exists", self.collection_name
-            )
-            self._collection_ensured = True
-            return
+            desc = self.client.describe_collection(self.collection_name)
 
+            # 从描述中提取字段信息（pymilvus 3.0 返回结构）
+            fields = desc.get("fields", [])
+            # pymilvus >= 3.0 可能用 "schema" 嵌套
+            if not fields and "schema" in desc:
+                fields = desc["schema"].get("fields", [])
+
+            has_auto_id = any(f.get("auto_id", False) for f in fields)
+            if has_auto_id:
+                # schema 兼容，直接使用
+                logger.info(
+                    "Milvus collection '%s' already exists (auto_id schema)",
+                    self.collection_name,
+                )
+                self._collection_ensured = True
+                return
+
+            # 不兼容（旧版 langchain-milvus schema，或 schema 没 auto_id）
+            logger.warning(
+                "Milvus collection '%s' has incompatible schema "
+                "(missing auto_id), dropping and recreating...",
+                self.collection_name,
+            )
+            try:
+                self.client.drop_collection(self.collection_name)
+                logger.info("Dropped collection '%s'", self.collection_name)
+            except Exception as e:
+                raise RuntimeError(
+                    f"无法删除旧版集合 '{self.collection_name}': {e}\n"
+                    f"请手动删除后重试：\n"
+                    f"  在 Milvus 中执行: drop collection {self.collection_name}"
+                ) from e
+
+        # ---------- 创建新集合 ----------
         dim = self._get_dimension()
         self.client.create_collection(
             collection_name=self.collection_name,
             dimension=dim,
-            auto_id=True,               # 自动生成主键
-            enable_dynamic_field=True,  # 动态 schema，允许任意 metadata 字段
+            auto_id=True,               # 自动生成主键 id
+            enable_dynamic_field=True,  # 动态 schema，任意 metadata 字段
         )
         logger.info(
-            "Created Milvus collection '%s' (dim=%d, auto_id=True)",
+            "Created Milvus collection '%s' (dim=%d, auto_id=True, dynamic=True)",
             self.collection_name,
             dim,
         )
@@ -128,12 +166,23 @@ class VectorStore:
                 "vector": embeddings[i],
                 "text": doc.page_content,
             }
-            # 展平 metadata：简单类型直接写入，复杂类型序列化为 JSON
+            # 写入 metadata，但跳过保留字段名（防止覆盖 text/vector/id）
             for k, v in doc.metadata.items():
-                if isinstance(v, (str, int, float, bool)):
-                    entry[k] = v
+                if k in _RESERVED_FIELDS:
+                    # 用 _meta_ 前缀避免字段名冲突
+                    safe_key = f"_meta_{k}"
+                    logger.debug(
+                        "Metadata key '%s' collides with reserved field, renamed to '%s'",
+                        k,
+                        safe_key,
+                    )
                 else:
-                    entry[k] = _safe_serialize(v)
+                    safe_key = k
+
+                if isinstance(v, (str, int, float, bool)):
+                    entry[safe_key] = v
+                else:
+                    entry[safe_key] = _safe_serialize(v)
 
             data.append(entry)
 
@@ -216,7 +265,10 @@ def _safe_serialize(value: Any) -> str:
 
 
 def _parse_search_results(raw_results) -> List[Document]:
-    """将 MilvusClient.search() 的原始返回解析为 ``List[Document]``。"""
+    """将 MilvusClient.search() 的原始返回解析为 ``List[Document]``。
+
+    兼容 pymilvus 3.0 的 HybridHits 和常规 dict 两种返回格式。
+    """
     docs: List[Document] = []
 
     if not raw_results or len(raw_results) == 0:
@@ -224,17 +276,32 @@ def _parse_search_results(raw_results) -> List[Document]:
 
     for hit in raw_results[0]:
         entity: Dict[str, Any] = hit.get("entity", {})
-        text: str = entity.pop("text", "") if entity else ""
 
-        # 清理：排除向量和内部 id
-        entity.pop("vector", None)
-        entity.pop("id", None)
+        if not entity:
+            # 有时 hit 本身就是 Hit 对象，entity 可能为空
+            # 尝试直接从 hit 中读取字段
+            text = str(hit.get("text", ""))
+            metadata: Dict[str, Any] = {}
+            # 收集所有非保留字段
+            for k in hit:
+                if k not in ("id", "distance", "entity", "vector"):
+                    metadata[k] = hit[k]
+        else:
+            # 标准路径：从 entity 中提取 text
+            raw_text = entity.pop("text", "")
+            text = str(raw_text) if raw_text is not None else ""
+
+            # 清理：排除向量和内部 id
+            entity.pop("vector", None)
+            entity.pop("id", None)
+
+            metadata = entity
 
         # 搜索分数写入 metadata
-        entity["search_score"] = hit.get("distance", 0.0)
+        metadata["search_score"] = hit.get("distance", 0.0)
 
         docs.append(
-            Document(page_content=text, metadata=entity)
+            Document(page_content=text, metadata=metadata)
         )
 
     return docs
