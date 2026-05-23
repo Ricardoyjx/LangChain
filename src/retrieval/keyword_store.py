@@ -20,21 +20,20 @@ class BM25StoreManager:
         if self.corpus:
             self.build_index()
 
-
-def _tokenize(self, texts):
-    """
-    统一的分词处理（支持中英文混合）
-    """
-    # 使用 jieba 进行中文分词，并用 Stemmer 处理英文词干
-    tokenized = []
-    for text in texts:
-        # 简单的分词逻辑：jieba 切分后，对纯英文单词做词干提取
-        words = list(jieba.cut(text))
-        processed_words = [
-            self.stemmer.stemWord(w) if w.isalpha() else w for w in words
-        ]
+    def _tokenize(self, texts):
+        # """
+        # 统一的分词处理（支持中英文混合）
+        # """
+        # # 使用 jieba 进行中文分词，并用 Stemmer 处理英文词干
+        tokenized = []
+        for text in texts:
+            # 简单的分词逻辑：jieba 切分后，对纯英文单词做词干提取
+            words = list(jieba.cut(text))
+            processed_words = [
+                self.stemmer.stemWord(w) if w.isalpha() else w for w in words
+            ]
         tokenized.append(processed_words)
-    return tokenized
+        return tokenized
 
 
 def build_index(self):
