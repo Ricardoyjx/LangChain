@@ -80,14 +80,28 @@ class IngestPipeline:
 
         # 嵌入模型（延迟初始化）
         self._embedding_model_name = embedding_model_name
-        self._embedding_model = OllamaEmbeddings(model=embedding_model_name)
 
         # 检索器（build_index 后可用）
         self.vector_store: Optional[FAISS] = None
         self.bm25_retriever: Optional[BM25Retriever] = None
 
-        # LLM（在查询阶段使用，但先在摄取端创建方便传入 QueryPipeline）
-        self.llm = create_ollama_client(llm_model, ollama_base_url, temperature)
+        # ---------- 初始化 Ollama 客户端 ----------
+        try:
+            self._embedding_model = OllamaEmbeddings(model=embedding_model_name)
+        except Exception as e:
+            raise ConnectionError(
+                f"Ollama 嵌入模型初始化失败 (model={embedding_model_name!r}, "
+                f"url={ollama_base_url!r}): {e}"
+            ) from e
+
+        try:
+            self.llm = create_ollama_client(llm_model, ollama_base_url, temperature)
+        except Exception as e:
+            raise ConnectionError(
+                f"Ollama LLM 初始化失败 (model={llm_model!r}, "
+                f"url={ollama_base_url!r}): {e}"
+            ) from e
+        # -----------------------------------------
 
     # ------------------------------------------------------------------
     def run(self, file_path: str) -> Dict[str, Any]:

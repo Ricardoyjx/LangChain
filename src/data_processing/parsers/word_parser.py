@@ -50,10 +50,21 @@ class WordParser(BaseParser):
                 "python-docx is required. Install it with: pip install python-docx"
             )
 
+        if not os.path.isfile(file_path):
+            raise FileNotFoundError(f"Word 文件不存在: {file_path}")
+
         try:
             doc = Document(file_path)
         except DocxPackageNotFoundError as e:
-            raise FileNotFoundError(str(e))
+            raise FileNotFoundError(
+                f"无法打开 Word 文件 (可能已损坏或不是有效 .docx): {file_path}\n"
+                f"  详情: {e}"
+            ) from e
+        except Exception as e:
+            raise ValueError(
+                f"解析 Word 文件失败: {file_path}\n"
+                f"  详情: {e}"
+            ) from e
 
         # 提取段落文本
         paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
@@ -62,11 +73,16 @@ class WordParser(BaseParser):
         # 提取表格
         all_tables = []
         for table in doc.tables:
-            records = _extract_table_from_doc(table)
-            if records:
-                all_tables.append(records)
+            try:
+                records = _extract_table_from_doc(table)
+                if records:
+                    all_tables.append(records)
+            except Exception as e:
+                print(f"  [警告] 表格解析异常 (已跳过): {e}")
+                continue
 
-        print(f"Parsing Word file: {file_path}")
+        print(f"  Word 解析完成: {os.path.basename(file_path)} "
+              f"({len(paragraphs)} 段落, {len(all_tables)} 个表格)")
         return {
             "content": full_text.strip(),
             "metadata": {

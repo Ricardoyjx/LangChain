@@ -34,21 +34,37 @@ class PDFParser(BaseParser):
     def parse(self, file_path: str) -> Dict[str, Any]:
         full_text = ""
         all_tables = []
+        total_pages = 0
 
-        with pdfplumber.open(file_path) as pdf:
-            print(f"该PDF总页数: {len(pdf.pages)}")
+        if not os.path.isfile(file_path):
+            raise FileNotFoundError(f"PDF 文件不存在: {file_path}")
+
+        try:
+            pdf = pdfplumber.open(file_path)
+        except Exception as e:
+            raise ValueError(
+                f"无法打开 PDF 文件 (可能已损坏或不是有效 PDF): {file_path}\n"
+                f"  详情: {e}"
+            ) from e
+
+        with pdf:
             total_pages = len(pdf.pages)
-            for page in pdf.pages:
-                text = page.extract_text()
-                if text:
-                    full_text += text + "\n"
+            for page_num, page in enumerate(pdf.pages, 1):
+                try:
+                    text = page.extract_text()
+                    if text:
+                        full_text += text + "\n"
 
-                tables = page.extract_tables()
-                for table in tables:
-                    if table:
-                        all_tables.append(_table_to_records(table[0], table[1:]))
+                    tables = page.extract_tables()
+                    for table in tables:
+                        if table:
+                            all_tables.append(_table_to_records(table[0], table[1:]))
+                except Exception as e:
+                    print(f"  [警告] 第 {page_num}/{total_pages} 页解析异常: {e}")
+                    continue
 
-        print(f"Parsing PDF file: {file_path}")
+        print(f"  PDF 解析完成: {os.path.basename(file_path)} ({total_pages} 页, "
+              f"{len(all_tables)} 个表格)")
         return {
             "content": full_text.strip(),
             "metadata": {

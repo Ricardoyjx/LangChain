@@ -9,20 +9,30 @@
     python main.py --prompt analysis             # 指定提示词模板
 """
 
-
 # ── numpy/torch 兼容补丁 ───────────────────────────────────
 # PyTorch C++ 层引用了 numpy._globals._signature_descriptor，
 # 该属性在 NumPy 1.26+ 中已移除。此处补充定义以抑制告警。
 import numpy._globals
-if not hasattr(numpy._globals, '_signature_descriptor'):
-    class _signature_descriptor: pass
+
+if not hasattr(numpy._globals, "_signature_descriptor"):
+
+    class _signature_descriptor:
+        pass
+
     numpy._globals._signature_descriptor = _signature_descriptor
 # ────────────────────────────────────────────────────────────
 
 import argparse
 import sys
+import traceback
 from pathlib import Path
 from typing import List, Optional
+
+try:
+    from requests.exceptions import ConnectionError as RequestsConnectionError
+except ImportError:
+    # requests not installed; ConnectionError will be caught via builtin
+    RequestsConnectionError = ConnectionError
 
 from src.evaluator import FinancialEvaluator
 from src.generation.prompt_template import list_templates, format_prompt
@@ -269,6 +279,10 @@ def run_interactive(pipeline: RAGPipeline, initial_prompt: str = DEFAULT_PROMPT)
                 print(chunk, end="", flush=True)
                 full_response += chunk
             print()
+        except (RequestsConnectionError, ConnectionResetError) as e:
+            print(f"\n[错误] Ollama 连接断开: {e}")
+            print("请确认 Ollama 服务正在运行: ollama serve")
+            continue
         except Exception as e:
             print(f"\n[错误] 生成回答时出错: {e}")
             continue
@@ -334,8 +348,11 @@ def run_single_query(pipeline: RAGPipeline, query: str, prompt_name: str):
     try:
         answer = pipeline.query(query, prompt_name=prompt_name)
         print(f"回答:\n{answer}")
+    except (RequestsConnectionError, ConnectionResetError) as e:
+        print(f"[错误] 查询时 Ollama 连接失败: {e}")
+        print("请确认 Ollama 服务正在运行: ollama serve")
     except Exception as e:
-        print(f"[错误] {e}")
+        print(f"[错误] 查询失败: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -392,16 +409,47 @@ def main():
     args = parse_args()
 
     # 检查数据目录
-    if not RAW_DIR.exists() or not list(RAW_DIR.glob("*.pdf")):
-        print(f"错误: 在 {RAW_DIR}/ 下未找到 PDF 文档。")
-        print(f"请将金融研报/年报等 PDF 文件放入 {RAW_DIR}/ 目录。")
+    if not RAW_DIR.exists():
+        print(f"[错误] 目录不存在: {RAW_DIR}/")
+        print(f"请先创建目录并将金融研报/年报等 PDF 文件放入其中:")
+        print(f"  mkdir -p {RAW_DIR}/")
+        sys.exit(1)
+
+    pdf_files = sorted(RAW_DIR.glob("*.pdf"))
+    if not pdf_files:
+        print(f"[错误] 在 {RAW_DIR}/ 下未找到 PDF 文档。")
+        print(f"请将 PDF 文件放入 {RAW_DIR}/ 目录后重试。")
+        print(f"  cp /path/to/report.pdf {RAW_DIR}/")
         sys.exit(1)
 
     # 初始化管线（摄入或加载索引）
     try:
         pipeline = init_pipeline(force_reindex=args.force_reindex)
+    except (RequestsConnectionError, ConnectionResetError) as e:
+        print(f"[错误] Ollama 服务连接失败: {e}")
+        print()
+        print("可能的原因和解决方法:")
+        print("  1. Ollama 服务未启动   -> 执行: ollama serve")
+        print("  2. 端口不对             -> 检查 http://localhost:11434 是否可访问")
+        print("  3. 模型未拉取           -> 执行: ollama pull qwen3.5:9b")
+        print("  4. 如需远程 Ollama     -> 修改 pipeline.py 中的 _DEFAULT_OLLAMA_URL")
+        sys.exit(1)
+    except FileNotFoundError as e:
+        print(f"[错误] 文件未找到: {e}")
+        sys.exit(1)
+    except ImportError as e:
+        print(f"[错误] 缺少依赖库: {e}")
+        print("请安装所需包:")
+        print("  pip install -r requirements.txt")
+        sys.exit(1)
+    except ValueError as e:
+        print(f"[错误] 配置或参数错误: {e}")
+        sys.exit(1)
     except Exception as e:
-        print(f"[错误] 管线初始化失败: {e}")
+        print(f"[错误] 管线初始化发生未知异常: {e}")
+        print()
+        print("详细堆栈:")
+        traceback.print_exc()
         sys.exit(1)
 
     # 仅摄入模式
