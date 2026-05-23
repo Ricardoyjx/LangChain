@@ -36,7 +36,7 @@ except ImportError:
 
 from src.evaluator import FinancialEvaluator
 from src.generation.prompt_template import list_templates, format_prompt
-from src.pipeline import RAGPipeline
+from src.pipeline import RAGPipeline, setup_logging
 
 # ---------------------------------------------------------------------------
 # 常量
@@ -407,6 +407,8 @@ def parse_args() -> argparse.Namespace:
 
 
 def main():
+    setup_logging()
+
     args = parse_args()
 
     # 检查数据目录
