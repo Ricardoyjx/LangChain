@@ -12,7 +12,7 @@
 import re
 from typing import Any, Dict, List, Optional
 
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+# import moved inside _build_recursive_splitter to avoid scipy/numpy crash
 
 
 # ── 递归切分（通用）──────────────────────────────────────
@@ -20,8 +20,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 def _build_recursive_splitter(
     chunk_size: int,
     chunk_overlap: int,
-) -> RecursiveCharacterTextSplitter:
+):
     """构造针对中文优化的递归文本切分器。"""
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
     return RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,

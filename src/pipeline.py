@@ -32,7 +32,7 @@ from langchain_core.documents import Document
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableParallel
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_ollama import OllamaEmbeddings
 
 from src.data_processing.cleaner import clean_text
 from src.data_processing.chunker import chunk_text
@@ -43,7 +43,7 @@ from src.generation import create_ollama_client, get_prompt
 # 默认配置
 # ---------------------------------------------------------------------------
 
-_DEFAULT_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+_DEFAULT_EMBEDDING_MODEL = "qwen3.5:9b"
 _DEFAULT_LLM_MODEL = "qwen3.5:9b"
 _DEFAULT_OLLAMA_URL = "http://localhost:11434"
 _DEFAULT_TEMPERATURE = 0.3
@@ -80,7 +80,7 @@ class IngestPipeline:
 
         # 嵌入模型（延迟初始化）
         self._embedding_model_name = embedding_model_name
-        self._embedding_model = HuggingFaceEmbeddings(model_name=embedding_model_name)
+        self._embedding_model = OllamaEmbeddings(model=embedding_model_name)
 
         # 检索器（build_index 后可用）
         self.vector_store: Optional[FAISS] = None
