@@ -43,7 +43,7 @@ from src.generation import create_ollama_client, get_prompt
 # 默认配置
 # ---------------------------------------------------------------------------
 
-_DEFAULT_EMBEDDING_MODEL = "qwen3.5:9b"
+_DEFAULT_EMBEDDING_MODEL = "nomic-embed-text"
 _DEFAULT_LLM_MODEL = "qwen3.5:9b"
 _DEFAULT_OLLAMA_URL = "http://localhost:11434"
 _DEFAULT_TEMPERATURE = 0.3
