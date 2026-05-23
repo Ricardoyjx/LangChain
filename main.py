@@ -80,13 +80,19 @@ def init_pipeline(force_reindex: bool = False) -> RAGPipeline:
         print("（如需重新构建，请删除 data/vector_db/ 目录或使用 --force-reindex）")
         pipeline._ingest.load_index(str(INDEX_DIR))
         from src.pipeline import QueryPipeline
+        from src.retrieval import PostFilterChain, DeduplicationFilter, TimeRangeFilter, BM25Reranker
+
+        chain = PostFilterChain()
+        chain.add_filter(DeduplicationFilter())
+        chain.add_filter(TimeRangeFilter())
+        reranker = BM25Reranker(pipeline._ingest.bm25_store) if True else None
 
         pipeline._query = QueryPipeline(
-            vector_store=pipeline._ingest.vector_store,
-            bm25_retriever=pipeline._ingest.bm25_retriever,
+            hybrid_search=pipeline._ingest.hybrid_search,
             llm=pipeline._ingest.llm,
             top_k=DEFAULT_TOP_K,
-            rerank=True,
+            post_filter_chain=chain,
+            reranker=reranker,
         )
     else:
         if force_reindex:

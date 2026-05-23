@@ -24,17 +24,22 @@ class VectorStore:
         self.embedding_function = embedding_function or DashScopeEmbeddings()
         self.collection_name = collection_name
         self.uri = uri
+        # Milvus 构造函数用 connection_args 传 uri，而非直接传 uri 参数
         self.vector_store = Milvus(
             collection_name=collection_name,
             embedding_function=self.embedding_function,
-            uri=uri,
+            connection_args={"uri": uri},
         )
 
     def add_documents(self, documents: List[Document], ids: List[str] = None):
         if ids is None:
             ids = [f"id_{i}" for i in range(len(documents))]
         self.vector_store.add_documents(documents=documents, ids=ids)
-        logger.info("Added %d documents to Milvus collection '%s'", len(documents), self.collection_name)
+        logger.info(
+            "Added %d documents to Milvus collection '%s'",
+            len(documents),
+            self.collection_name,
+        )
 
     def delete_documents(self, ids: List[str]):
         self.vector_store.delete(ids)
@@ -44,7 +49,9 @@ class VectorStore:
         self.delete_documents(ids)
         self.add_documents(documents, ids)
 
-    def search_documents(self, query: str, k: int = 3, filter_dict: dict = None) -> List[Document]:
+    def search_documents(
+        self, query: str, k: int = 3, filter_dict: dict = None
+    ) -> List[Document]:
         """按语义相似度检索"""
         return self.vector_store.similarity_search(query=query, k=k, filter=filter_dict)
 
