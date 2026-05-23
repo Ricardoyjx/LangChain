@@ -40,7 +40,13 @@ class HybridSearchManager:
                 doc_map[doc_id] = doc
 
         for rank, item in enumerate(keyword_docs):
-            doc_id = item["content"]
+            raw = item.get("content", "")
+            doc_id = str(raw) if not isinstance(raw, str) else raw
+            if not isinstance(raw, str):
+                logger.warning(
+                    "RRF keyword: item['content'] is %s (not str), converted; content=%.60s",
+                    type(raw).__name__, doc_id,
+                )
             rrf_scores[doc_id] = rrf_scores.get(doc_id, 0.0) + 1.0 / (self.k + rank + 1)
             if doc_id not in doc_map:
                 doc_map[doc_id] = Document(page_content=doc_id, metadata={})

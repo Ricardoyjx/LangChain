@@ -74,5 +74,7 @@ class BM25StoreManager:
         # 整理返回结果
         search_results = []
         for i, (doc, score) in enumerate(zip(results[0], scores[0])):
-            search_results.append({"rank": i + 1, "score": float(score), "content": doc})
+            # 保证 content 是字符串（bm25s 加载后可能是 numpy 类型或 dict）
+            content = str(doc) if not isinstance(doc, (str, bytes)) else doc
+            search_results.append({"rank": i + 1, "score": float(score), "content": content})
         return search_results
