@@ -97,11 +97,11 @@ services:
       # 如果你是连接外部 Milvus，请改为具体的 IP:19530
       MILVUS_URL: milvus:19530
     ports:
-      - "8000:3001" # 左边是宿主机端口，右边是容器端口
+      - "8000:3000" # 左边是宿主机端口，右边是容器端口
     depends_on:
       - milvus # 确保 Milvus 先启动（如果你把 Milvus 也写在这个文件里的话）
-    # networks:
-    #   - milvus-net # 确保 Attu 和 Milvus 在同一个网络    
+    networks:
+      - rag-net
 
   ollama:
     image: ollama/ollama:latest
